@@ -1,0 +1,12 @@
+{
+    "media":"http://media_service:8000",
+    "users":"http://users_service:8000",
+    "cast":"http://cast_service:8000",
+    "filters":"http://filters_service:8000",
+    "subscription":"http://subscription_service:8000",
+    "coupons":"http://coupons_service:8000",
+    "imdb_crawler":"http://imdb_microservice_api:8000",
+    "media_crawler":"http://media_microservice_api:8000",
+    "subtitle_crawler":"http://subtitle_microservice_api:8000",
+    "suggestions":"http://suggestion_service:8000"
+}

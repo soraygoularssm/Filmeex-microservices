@@ -1,0 +1,254 @@
+version: '3.7'
+
+services:
+  # consul_discovery:
+  #   image: progrium/consul
+  #   command: -server -bootstrap -ui-dir /ui
+  #   hostname: 'node1'
+  #   ports: 
+  #     #- 8400:8400
+  #     - 8500:8500
+  #     # - 8600:53/udp
+  #   #network_mode: "host"
+  
+  # consul_registrator:
+  #   image: gliderlabs/registrator:latest
+  #   command: consul://consul_discovery:8500
+  #   volumes: 
+  #     - /var/run/docker.sock:/tmp/docker.sock
+  #   depends_on:
+  #     - consul_discovery
+
+  api_gateway:
+    image: fastapi_p:latest
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend/api_gateway/src/:/app/
+      - ./backend/scraping/services/imdb/crawler/src/photos/:/app/files/photos
+    ports:
+      - 8000:8000
+    depends_on: 
+      - media_service
+      - cast_service
+      #- users_service
+      #- filters_service
+      #- subscription_service
+      #- coupons_service
+      - discovery_service
+  
+  media_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/media/src/:/app/
+    depends_on:
+      - media_db
+      - discovery_service
+      # - imdb_microservice_api
+      # - cast_service
+      # - filters_service
+    # environment:
+    #   - DATABASE_URI=
+    #   - CAST_SERVICE_HOST_URL=
+
+  media_db:
+    image: mongo
+    volumes:
+      - monog_data_media:/data/db
+    # environment:
+    #   MONGO_INITDB_ROOT_USERNAME: soraygoular
+    #   MONGO_INITDB_ROOT_PASSWORD: adminissoraygoular
+  
+  suggestion_service:
+    image: fastapi_p:latest
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/suggestions/src/:/app/
+    ports:
+      - 8888:8000
+    depends_on:
+      - media_db
+
+  cast_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/cast/src/:/app/
+    ports:
+      - 9998:8000
+    depends_on:
+      - cast_db
+  
+  cast_db:
+    image: mongo
+    volumes:
+      - mongo_data_cast:/data/db
+    # environment:
+    #   MONGO_INITDB_ROOT_USERNAME: soraygoular
+    #   MONGO_INITDB_ROOT_PASSWORD: adminissoraygoular
+
+  users_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/users/src/:/app/
+    ports:
+      - 9090:8000
+    depends_on:
+      - users_db
+  
+  users_db:
+    image: mongo
+    volumes:
+      - mongo_data_users:/data/db
+
+  filters_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/filter_services/src/:/app/
+    ports:
+      - 9094:8000
+    depends_on:
+      - filters_db
+  
+  filters_db:
+    image: mongo
+    volumes:
+      - mongo_data_filters:/data/db
+
+  subscription_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/subscription/src/:/app/
+    ports:
+      - 9095:8000
+    depends_on:
+      - subscription_db
+  
+  subscription_db:
+    image: mongo
+    volumes:
+      - mongo_data_subscription:/data/db
+    
+  coupons_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/coupons/src/:/app/
+    ports:
+      - 9096:8000
+    depends_on:
+      - coupons_db
+  
+  coupons_db:
+    image: mongo
+    volumes:
+      - mongo_data_coupons:/data/db
+
+  discovery_service:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    restart: always
+    volumes:
+      - ./backend/discovery/src/:/app/
+    
+  scraper_microservice_api:
+    image: 22fefd13ac7e
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend/scraping/manager/src/:/app/
+    ports:
+      - 8008:8000
+    depends_on:
+      - discovery_service
+      - media_microservice_api
+      - imdb_microservice_api
+      - subtitle_microservice_api
+      - media_service
+
+  imdb_microservice_api:
+    image: 22fefd13ac7e
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend/scraping/services/imdb/api/:/app/
+    ports:
+      - 8009:8000
+    depends_on: 
+      - imdb_microservice_crawler
+  
+  imdb_microservice_crawler:
+    image: 9421bca37c43
+    command: scrapyrt -i 0.0.0.0 -p 9080 -s TIMEOUT_LIMIT=180
+    restart: always
+    volumes:
+      - ./backend/scraping/services/imdb/crawler/src/:/app/
+  
+  media_microservice_api: 
+    image: 22fefd13ac7e
+    #container_name: media_microservice_api
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend/scraping/services/media/api/:/app/
+    ports:
+      - 8010:8000
+    depends_on:
+      - media_microservice_crawler
+
+  media_microservice_crawler:
+    image: 9421bca37c43
+    #container_name: media_microservice_crawler
+    command: scrapyrt -i 0.0.0.0 -p 9081
+    restart: always
+    volumes:
+      - ./backend/scraping/services/media/crawler/src/:/app/
+
+  subtitle_microservice_api:
+    image: 22fefd13ac7e
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend/scraping/services/subtitle/api/:/app/
+    ports:
+      - 8011:8000
+    depends_on:
+      - subtitle_microservice_crawler
+
+  subtitle_microservice_crawler:
+    image: 9421bca37c43
+    command: scrapyrt -i 0.0.0.0 -p 9082
+    restart: always
+    volumes:
+      - ./backend/scraping/services/subtitle/crawler/src/:/app/
+
+  frontend:
+    build: ./frontend
+    command: npm run serve
+    restart: always
+    volumes:
+      - ./frontend/filmeex/:/app/
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - 8080:8080
+    volumes:
+      - ./nginx_config.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - api_gateway
+      - frontend
+
+volumes:
+  monog_data_media:
+  mongo_data_cast:
+  mongo_data_users:
+  mongo_data_filters:
+  mongo_data_subscription:
+  mongo_data_coupons:
